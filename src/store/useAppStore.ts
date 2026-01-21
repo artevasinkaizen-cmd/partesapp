@@ -39,12 +39,20 @@ interface AppState {
     getParte: (id: number) => Parte | undefined;
     updateUserProfile: (email: string, data: Partial<User>) => Promise<void>;
     changePassword: (email: string, oldPass: string, newPass: string) => Promise<boolean>;
+
+    // New Actions
+    uploadAvatar: (file: File) => Promise<string | null>;
+    updateUserRole: (userId: string, role: string) => Promise<void>;
+    deleteUser: (userId: string) => Promise<void>;
+    adminCreateUser: (user: User) => Promise<boolean>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+    // ... (rest)
+
     activeView: 'list',
     setActiveView: (view) => set({ activeView: view }),
-    isLoading: false,
+    isLoading: true, // Start true to prevent redirect before check
     error: null,
 
     currentUser: null,
@@ -53,22 +61,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     users: [],
 
     checkSession: async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            set({
-                currentUser: {
-                    email: session.user.email!,
-                    name: session.user.user_metadata.full_name || '',
-                    password: '', // Not needed/available
-                    role: 'user'
-                }
-            });
-            // Load data when session exists
-            get().fetchData();
-        } else {
-            set({ currentUser: null, partes: [], clients: [] });
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                set({
+                    currentUser: {
+                        id: session.user.id,
+                        email: session.user.email!,
+                        name: session.user.user_metadata.full_name || '',
+                        password: '', // Not needed/available
+                        role: 'user'
+                    }
+                });
+                // Load data when session exists
+                await get().fetchData();
+            } else {
+                set({ currentUser: null, partes: [], clients: [] });
+            }
+        } catch (error) {
+            console.error('Session check failed:', error);
+            set({ currentUser: null });
+        } finally {
+            set({ isLoading: false });
         }
     },
+
+    // ... (keep loginUser, registerUser, etc. unchanged if possible, or just replace the block if needed. 
+    // To match the ReplaceFileContent strictness, I should target specific blocks or the whole file if scattered.
+    // It's safer to target checkSession independently if I can, but I want to fix fetchData too.)
+
+    // Let's do checkSession first.
+
 
     loginUser: async (email, password) => {
         set({ isLoading: true, error: null });
@@ -82,6 +105,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (data.user) {
             set({
                 currentUser: {
+                    id: data.user.id,
                     email: data.user.email!,
                     name: data.user.user_metadata.full_name || '',
                     password: '',
@@ -118,82 +142,111 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
 
     fetchData: async () => {
-        set({ isLoading: true });
+        // Do not set isLoading=true here, as it triggers AuthGuard unmount loop.
+        // Loading local state should be handled by components if needed.
 
-        // 1. Fetch Partes and related Actuaciones
-        // Note: Supabase returns flat rows usually. We need to nest them or fetch separate.
-        // Let's fetch separate and map.
+        try {
+            // 1. Fetch Partes
+            const { data: partesData, error: partesError } = await supabase
+                .from('partes')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-        const { data: partesData, error: partesError } = await supabase
-            .from('partes')
-            .select('*')
-            .order('created_at', { ascending: false });
+            if (partesError) throw partesError;
 
-        if (partesError) {
-            console.error('Error fetching partes:', partesError);
-            set({ isLoading: false });
-            return;
+            // 2. Fetch Actuaciones
+            const { data: actData, error: actError } = await supabase
+                .from('actuaciones')
+                .select('*');
+
+            if (actError) console.error('Error fetching actuaciones:', actError);
+
+            // 3. Fetch Users (for avatars)
+            const { data: usersData } = await supabase.from('users').select('*');
+            if (usersData) {
+                set({ users: usersData });
+
+                // Sync currentUser with latest data from DB (to fix stale avatar in session)
+                const { currentUser } = get();
+                if (currentUser) {
+                    const freshUser = usersData.find((u: any) => u.id === currentUser.id);
+                    if (freshUser) {
+                        set(state => ({
+                            currentUser: state.currentUser ? {
+                                ...state.currentUser,
+                                avatar_url: freshUser.avatar_url,
+                                // Update other fields if needed, e.g. name from metadata
+                                name: freshUser.user_metadata?.full_name || state.currentUser.name
+                            } : null
+                        }));
+                    }
+                }
+            }
+
+            // Map to internal types
+            const mappedPartes: Parte[] = (partesData || []).map((p: any) => {
+                const pActs = (actData || []).filter((a: any) => a.parte_id === p.id);
+                return {
+                    id: p.id,
+                    title: p.description || 'Sin título',
+                    type: p.type as any,
+                    status: p.status as any,
+                    createdAt: p.start_date || p.created_at,
+                    createdBy: p.created_by || 'Sistema',
+                    userId: p.user_id || '',
+                    pdfFile: p.pdf_file,
+                    pdfFileSigned: p.pdf_file_signed,
+                    actuaciones: pActs.map((a: any) => ({
+                        id: a.id,
+                        parteId: a.parte_id,
+                        type: a.type as any,
+                        timestamp: a.date,
+                        duration: a.duration,
+                        notes: a.description,
+                        user: a.user || 'Sistema'
+                    })),
+                    totalTime: p.total_time || pActs.reduce((acc: number, act: any) => acc + (act.duration || 0), 0),
+                    totalActuaciones: pActs.length
+                };
+            });
+
+            set({ partes: mappedPartes });
+        } catch (error) {
+            console.error('Error in fetchData:', error);
         }
-
-        const { data: actData, error: actError } = await supabase
-            .from('actuaciones')
-            .select('*');
-
-        if (actError) console.error('Error fetching actuaciones:', actError);
-
-        // Map to internal types
-        const mappedPartes: Parte[] = (partesData || []).map(p => {
-            const pActs = (actData || []).filter(a => a.parte_id === p.id);
-            return {
-                id: p.id,
-                title: p.description || 'Sin título', // Mapping description to title as per old schema? Or maybe add title col? Let's use description for now
-                type: p.type as any,
-                status: p.status as any,
-                createdAt: p.created_at,
-                createdBy: 'Sistema', // Placeholder until we join profiles
-                userId: p.user_id || '', // Start with ID
-
-                // Fields that were in 'Omit' but are needed in Parte
-                pdfFile: undefined,
-                pdfFileSigned: undefined,
-
-                actuaciones: pActs.map(a => ({
-                    id: a.id,
-                    parteId: a.parte_id,
-                    type: a.type as any,
-                    timestamp: a.date,
-                    duration: a.duration,
-                    notes: a.description,
-                    user: 'Sistema' // Placeholder
-                })),
-                totalTime: p.total_time,
-                totalActuaciones: pActs.length
-            };
-        });
-
-        set({ partes: mappedPartes, isLoading: false });
     },
+
+    // ... (Existing actions)
 
     addParte: async (parteData) => {
         const { currentUser } = get();
         if (!currentUser) return;
 
+        const payload: any = {
+            type: 'INCIDENCIA',
+            description: parteData.title,
+            status: parteData.status,
+            start_date: parteData.createdAt,
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            created_by: parteData.createdBy, // Save the manual name
+            pdf_file: parteData.pdfFile
+        };
+
+        // Respect custom ID if provided
+        if (parteData.id) {
+            payload.id = parteData.id;
+        }
+
         const { error } = await supabase
             .from('partes')
-            .insert({
-                type: 'INCIDENCIA', // Default or from input if we add it to UI
-                description: parteData.title,
-                status: parteData.status,
-                start_date: parteData.createdAt,
-                user_id: (await supabase.auth.getUser()).data.user?.id
-            });
+            .insert(payload);
 
         if (error) {
             console.error('Error adding parte:', error);
             set({ error: error.message });
             return;
         }
-        get().fetchData();
+        await get().fetchData();
     },
 
     updateParteStatus: async (id, status) => {
@@ -202,7 +255,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             .update({ status, closed_at: status === 'CERRADO' ? new Date().toISOString() : null })
             .eq('id', id);
 
-        if (!error) get().fetchData();
+        if (!error) await get().fetchData();
     },
 
     updateParte: async (id, data) => {
@@ -213,13 +266,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         if (Object.keys(updatePayload).length > 0) {
             await supabase.from('partes').update(updatePayload).eq('id', id);
-            get().fetchData();
+            await get().fetchData();
         }
     },
 
     deleteParte: async (id) => {
         await supabase.from('partes').delete().eq('id', id);
-        get().fetchData();
+        await get().fetchData();
     },
 
     addActuacion: async (parteId, actuacion) => {
@@ -230,10 +283,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 type: actuacion.type,
                 description: actuacion.notes,
                 date: actuacion.timestamp || new Date().toISOString(),
-                duration: actuacion.duration
+                duration: actuacion.duration,
+                user: actuacion.user // Save the technician name
             });
 
-        if (!error) get().fetchData();
+        if (!error) await get().fetchData();
     },
 
     updateActuacion: async (_parteId, actuacionId, data) => {
@@ -243,12 +297,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (data.type) payload.type = data.type;
 
         await supabase.from('actuaciones').update(payload).eq('id', actuacionId);
-        get().fetchData();
+        await get().fetchData();
     },
 
     deleteActuacion: async (_parteId, actuacionId) => {
         await supabase.from('actuaciones').delete().eq('id', actuacionId);
-        get().fetchData();
+        await get().fetchData();
     },
 
     addClient: async () => { console.warn('Add Client placeholder'); },
@@ -266,4 +320,77 @@ export const useAppStore = create<AppState>((set, get) => ({
         return !error;
     },
 
+    uploadAvatar: async (file) => {
+        const { currentUser } = get();
+        if (!currentUser?.id) return null;
+
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const base64 = reader.result as string;
+                // Custom endpoint fetch
+                try {
+                    const res = await fetch('/api/upload/avatar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64, userId: currentUser.id })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        // Update local user state immediately
+                        set(state => ({
+                            currentUser: state.currentUser ? { ...state.currentUser, avatar_url: data.avatarUrl } : null
+                        }));
+                        // Also refresh all data to propagate to cards/users list
+                        await get().fetchData();
+                        resolve(data.avatarUrl);
+                    } else {
+                        resolve(null);
+                    }
+                } catch (e) {
+                    console.error("Upload error", e);
+                    resolve(null);
+                }
+            };
+        });
+    },
+
+    updateUserRole: async (userId, role) => {
+        await supabase.from('users').update({ role }).eq('id', userId);
+        await get().fetchData();
+    },
+
+    deleteUser: async (userId) => {
+        const { error } = await supabase.from('users').delete().eq('id', userId);
+        if (!error) {
+            await get().fetchData();
+        }
+    },
+
+    adminCreateUser: async (user) => {
+        // Use direct fetch to avoid clearing local session via supabase/localClient wrapper
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: user.email,
+                    password: user.password,
+                    options: { data: { full_name: user.name, role: 'user' } }
+                })
+            });
+            const data = await res.json();
+            if (data.error) {
+                console.error('Admin create user error:', data.error);
+                return false;
+            }
+            // Success
+            await get().fetchData();
+            return true;
+        } catch (e) {
+            console.error('Admin create user exception:', e);
+            return false;
+        }
+    }
 }));

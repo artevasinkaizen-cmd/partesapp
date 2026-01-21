@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import type { Parte } from '../../types';
+import { useAppStore } from '../../store/useAppStore';
 import { Badge } from '../ui/Badge';
 import { Clock, List } from 'lucide-react';
 import { format } from 'date-fns';
@@ -11,6 +12,14 @@ interface ParteCardProps {
 
 export const ParteCard = ({ parte }: ParteCardProps) => {
     const navigate = useNavigate();
+    const { users } = useAppStore();
+    const user = users.find(u => u.id === parte.userId || u.email === parte.userId); // userId might be email in legacy data? Types say string. Schema says userId is owner email or id. Let's match both. Actually store uses ID for new users but maybe email for old? 
+    // In server.js registration: id is 'user-' + timestamp. 
+    // In types: userId: string; // Owner email. Wait. 
+    // server.js /partes: user_id: 'user-...'
+    // So it links by ID.
+    // Let's safe match.
+
 
     return (
         <div
@@ -34,7 +43,22 @@ export const ParteCard = ({ parte }: ParteCardProps) => {
             </h3>
 
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-4">
-                <span className="truncate max-w-[100px]">{parte.createdBy}</span>
+                <div className="flex items-center gap-2">
+                    {user?.avatar_url ? (
+                        <img
+                            src={user.avatar_url}
+                            alt="Avatar"
+                            className="w-6 h-6 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                        />
+                    ) : (
+                        <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                            {(user?.name || parte.createdBy || '?').charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                    <span className="truncate max-w-[80px]">
+                        {user?.user_metadata?.full_name || user?.name || parte.createdBy}
+                    </span>
+                </div>
                 <span className="flex items-center gap-1">
                     {format(new Date(parte.createdAt), "d MMM", { locale: es })}
                 </span>

@@ -45,26 +45,25 @@ export const ParteEditor = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadStatus, setUploadStatus] = useState(''); // New state for progress text
 
-    const handleCreateParte = (e: React.FormEvent) => {
+    const handleCreateParte = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title) return;
 
         // Auto-save client
-        addClient({
+        await addClient({
             name: title,
-            // We could add more fields if the UI supported them
         });
 
-        addParte({
+        await addParte({
             title,
             status: 'ABIERTO',
             createdBy,
             id: customId ? parseInt(customId) : undefined,
             createdAt: new Date(customDate).toISOString(),
-            pdfFile: uploadedPdf // Store the file
+            pdfFile: uploadedPdf
         });
 
-        // In a real app we'd get the ID back, but for now let's just go to list or management
+        // Ensure we navigate after async operations complete
         navigate('/management');
     };
 

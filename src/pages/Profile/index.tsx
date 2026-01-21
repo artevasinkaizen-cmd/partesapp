@@ -3,10 +3,10 @@ import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
-import { User, Lock, Save } from 'lucide-react';
+import { User, Lock, Save, Upload } from 'lucide-react';
 
 export default function Profile() {
-    const { currentUser, updateUserProfile, changePassword } = useAppStore();
+    const { currentUser, updateUserProfile, changePassword, uploadAvatar } = useAppStore();
 
     // Personal Info State
     const [name, setName] = useState(currentUser?.name || '');
@@ -71,6 +71,51 @@ export default function Profile() {
                 <User className="w-6 h-6 text-blue-600" />
                 Mi Perfil
             </h1>
+
+            {/* Avatar Card */}
+            <Card>
+                <h2 className="text-lg font-semibold mb-6 text-slate-800 border-b border-slate-100 pb-2">
+                    Foto de Perfil
+                </h2>
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                    <div className="relative group">
+                        {currentUser?.avatar_url ? (
+                            <img
+                                src={currentUser.avatar_url}
+                                alt="Profile"
+                                className="w-24 h-24 rounded-full object-cover shadow-md ring-4 ring-white dark:ring-slate-700"
+                            />
+                        ) : (
+                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold shadow-md ring-4 ring-white dark:ring-slate-700">
+                                {currentUser?.name?.charAt(0).toUpperCase() || currentUser?.email?.charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <label className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-lg hover:bg-blue-700 cursor-pointer transition-transform hover:scale-110">
+                            <Upload className="w-4 h-4" />
+                            <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                    if (e.target.files?.[0]) {
+                                        const url = await uploadAvatar(e.target.files[0]);
+                                        if (url) {
+                                            setSuccessMsg('Foto actualizada');
+                                            setTimeout(() => setSuccessMsg(''), 3000);
+                                        }
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
+                    <div className="flex-1 text-center md:text-left">
+                        <h3 className="font-medium text-slate-900 dark:text-white">Cambiar foto de perfil</h3>
+                        <p className="text-sm text-slate-500 mt-1 mb-3">
+                            Sube una imagen (JPG, PNG) para que tus compañeros puedan reconocerte fácilmente en los partes.
+                        </p>
+                    </div>
+                </div>
+            </Card>
 
             {/* Personal Info Card */}
             <Card>

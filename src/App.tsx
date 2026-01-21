@@ -5,9 +5,9 @@ import Registration from './pages/Registration';
 import Management from './pages/Management'; // We will create this next
 import Dashboard from './pages/Dashboard'; // We will create this later
 import Login from './pages/Login';
-import SignUp from './pages/SignUp';
 import GlobalSearch from './pages/GlobalSearch';
 import Profile from './pages/Profile';
+import UsersPage from './pages/Users';
 
 import { useAppStore } from './store/useAppStore';
 
@@ -32,12 +32,13 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUp />} />
+        <Route path="/login" element={<Login />} />
         <Route element={<AuthGuard><Layout /></AuthGuard>}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/management" element={<Management />} />
           <Route path="/new" element={<Registration />} />
           <Route path="/global" element={<GlobalSearch />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/parte/:id" element={<Registration />} />
           <Route path="*" element={<Navigate to="/" replace />} />

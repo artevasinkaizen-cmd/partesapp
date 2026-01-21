@@ -56,8 +56,16 @@ export interface Client {
 }
 
 export interface User {
+    id?: string;
     email: string;
     password: string;
     name?: string;
     role?: string;
+    avatar_url?: string;
+    user_metadata?: {
+        full_name?: string;
+        avatar_url?: string;
+        [key: string]: any;
+    };
+    created_at?: string;
 }

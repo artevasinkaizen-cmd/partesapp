@@ -1,0 +1,61 @@
+{
+  "users": [
+    {
+      "id": "user-1768914513438",
+      "email": "fran.molina@serglobin.es",
+      "password": "KzN.1285",
+      "role": "admin",
+      "user_metadata": {
+        "full_name": "Fran MolSan",
+        "avatar_url": "/uploads/avatar_user-1768914513438_1768916415563.bin"
+      },
+      "created_at": "2026-01-20T13:08:33.438Z",
+      "avatar_url": "/uploads/avatar_user-1768914513438_1768916415563.bin"
+    }
+  ],
+  "partes": [],
+  "actuaciones": [
+    {
+      "parte_id": 11111,
+      "type": "Llamada Realizada",
+      "description": "<p>hjhhjkjhk</p>",
+      "date": "2026-01-13T08:43:40.380Z",
+      "duration": 1,
+      "user": "José Francisco Molina Sánchez",
+      "id": 1768293820388,
+      "created_at": "2026-01-13T08:43:40.388Z"
+    },
+    {
+      "parte_id": 11111,
+      "type": "Informe Corporativo",
+      "description": "<p>hjjkhjhkhjkhjkkhjhjkkhjhjkhjk</p>",
+      "date": "2026-01-13T08:43:59.698Z",
+      "duration": 10,
+      "user": "José Francisco Molina Sánchez",
+      "id": 1768293839706,
+      "created_at": "2026-01-13T08:43:59.706Z"
+    },
+    {
+      "parte_id": 1767963233102,
+      "type": "Investigación",
+      "description": "<p>jdjkfajksdfjksjkkj</p>",
+      "date": "2026-01-16T23:05:12.917Z",
+      "duration": 10,
+      "user": "José Francisco Molina Sánchez",
+      "id": 1768604712937,
+      "created_at": "2026-01-16T23:05:12.937Z"
+    },
+    {
+      "parte_id": 518095,
+      "type": "Incidencias",
+      "description": "<p></p><p>He&nbsp;estado&nbsp;en&nbsp;la&nbsp;consejería&nbsp;y&nbsp;tuvieron&nbsp;una&nbsp;incidencia&nbsp;con&nbsp;un&nbsp;ordenador&nbsp;no&nbsp;me&nbsp;da&nbsp;la&nbsp;gana&nbsp;de&nbsp;arreglárselo</p>",
+      "date": "2026-01-20T13:38:03.295Z",
+      "duration": 10,
+      "user": "José Francisco Molina Sánchez",
+      "id": 1768916283305,
+      "created_at": "2026-01-20T13:38:03.305Z"
+    }
+  ],
+  "clients": [],
+  "verifications": []
+}

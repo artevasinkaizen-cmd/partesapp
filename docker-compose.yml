@@ -1,0 +1,29 @@
+services:
+  app:
+    build: .
+    container_name: partes-app
+    ports:
+      - "5173:5173"
+      - "3001:3001"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      # Persist backend data
+      - ./server/db:/app/server/db
+      - ./server/uploads:/app/server/uploads
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    command: npm run dev:docker
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: partes-tunnel
+    links:
+      - app
+    environment:
+      - NGROK_AUTHTOKEN=38WKQb2orgRQemA8TqxTYDrJkr5_5X79tPEDWBFHSSrLeuz4z
+    command: http app:5173 --domain=jeremy-unacademical-positivistically.ngrok-free.dev
+
+    ports:
+      - "4040:4040"
+    restart: unless-stopped

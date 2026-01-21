@@ -7,6 +7,8 @@ import { Card } from '../../components/ui/Card';
 import { useAppStore } from '../../store/useAppStore';
 // import { EMAILJS_CONFIG } from '../../lib/email';
 
+import { supabase } from '../../utils/supabase';
+
 export default function SignUp() {
     const navigate = useNavigate();
     const { registerUser } = useAppStore();
@@ -14,14 +16,11 @@ export default function SignUp() {
     // Form State
     const [step, setStep] = useState<'email' | 'verification' | 'password'>('email');
     const [email, setEmail] = useState('');
-    const [verificationCode, setVerificationCode] = useState('');
     const [userCode, setUserCode] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-
-    const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
     const handleSendCode = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -30,44 +29,50 @@ export default function SignUp() {
             return;
         }
 
-        const code = generateCode();
-        setVerificationCode(code);
-
-        // FOR DEVELOPMENT: Show code immediately since email might fail
-        alert(`[MODO DESARROLLO] 
-Tu código de verificación es: ${code}
-(Cópialo para el siguiente paso)`);
-
         setLoading(true);
 
         try {
-            // V7 Privacy: EmailJS removed. Mocking success.
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            console.log('Verification code (simulated email):', code);
+            // @ts-ignore
+            const { error: sendError, data } = await supabase.auth.sendCode(email);
+
+            if (sendError) {
+                setError(sendError.message || 'Error al enviar código');
+                return;
+            }
+
+            if (data?.devCode) {
+                alert(`[MODO DESARROLLO - SIN SMTP] Tu código es: ${data.devCode}`);
+            }
 
             setStep('verification');
             setError('');
         } catch (err: any) {
-            console.error('EmailJS Error:', err);
-            setError('Error al enviar el correo. Verifica tu conexión o la configuración de EmailJS.');
-
-            // Fallback helpful message for the developer/user
-            // if (EMAILJS_CONFIG.PUBLIC_KEY === 'YOUR_PUBLIC_KEY') {
-            //     alert('⚠️ FALTA CONFIGURACIÓN: Necesitas poner tus claves de EmailJS en src/lib/email.ts');
-            // }
+            console.error(err);
+            setError('Error de conexión o servidor');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleVerifyCode = (e: React.FormEvent) => {
+    const handleVerifyCode = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (userCode !== verificationCode) {
-            setError('Código incorrecto');
-            return;
+        setLoading(true);
+        try {
+            // @ts-ignore
+            const { error: verifyError } = await supabase.auth.verifyCode(email, userCode);
+
+            if (verifyError) {
+                setError('Código incorrecto o expirado');
+                return;
+            }
+
+            setStep('password');
+            setError('');
+        } catch (err) {
+            setError('Error de verificación');
+        } finally {
+            setLoading(false);
         }
-        setStep('password');
-        setError('');
     };
 
     const handleRegister = async (e: React.FormEvent) => {

@@ -6,7 +6,7 @@ import { ActivityTypeChart } from '../dashboard/ActivityTypeChart';
 import { TrendChart } from '../dashboard/TrendChart';
 import { Button } from '../ui/Button';
 import { X, Calendar as CalendarIcon, Download, Loader2 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, startOfYear, endOfYear, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import html2canvas from 'html2canvas';
 
@@ -21,15 +21,26 @@ interface ReportModalProps {
 }
 
 export const ReportModal = ({ isOpen, onClose }: ReportModalProps) => {
-    const { partes } = useAppStore();
+    const { partes, currentUser } = useAppStore();
     const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Admin Scope State
+    // @ts-ignore
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.email === 'admin@admin.com'; // Fallback for testing
+    const [reportScope, setReportScope] = useState<'me' | 'all'>('me');
+
     const chartsRef = useRef<HTMLDivElement>(null);
 
-    // Filter logic for preview
-    const filteredPartes = partes.filter(p => {
+    // Filter logic for preview & Report
+    // First, filter by Scope
+    const scopePartes = reportScope === 'all'
+        ? partes
+        : partes.filter(p => p.userId === currentUser?.id || p.userId === currentUser?.email);
+
+    // Then by Date
+    const filteredPartes = scopePartes.filter(p => {
         const pDate = new Date(p.createdAt);
         return isWithinInterval(pDate, {
             start: new Date(startDate),
@@ -44,7 +55,7 @@ export const ReportModal = ({ isOpen, onClose }: ReportModalProps) => {
         avgTime: filteredPartes.length > 0 ? Math.round(filteredPartes.reduce((acc, p) => acc + p.totalTime, 0) / filteredPartes.length) : 0
     };
 
-    // Chart Data Preparation
+    // Chart Data Preparation (Based on filtered data)
     const statusData = [
         { name: 'ABIERTO', value: filteredPartes.filter(p => p.status === 'ABIERTO').length, color: '#f59e0b' },
         { name: 'EN TRÁMITE', value: filteredPartes.filter(p => p.status === 'EN TRÁMITE').length, color: '#3b82f6' },
@@ -124,74 +135,131 @@ export const ReportModal = ({ isOpen, onClose }: ReportModalProps) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="glass-card w-[90%] max-h-[90vh] overflow-y-auto rounded-2xl flex flex-col shadow-2xl animate-in zoom-in-95 duration-200 bg-white/80 dark:bg-slate-900/80">
-                {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b border-white/20 dark:border-white/10">
-                    <div>
-                        <h2 className="text-2xl font-display font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                            <Download className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                            Generar Informe PDF
-                        </h2>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">Selecciona el rango de fechas para el informe</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200">
+            {/* Fluent Card: Acrylic Material + Elevation */}
+            <div className="w-[90%] max-w-5xl max-h-[90vh] overflow-y-auto rounded-xl flex flex-col shadow-2xl animate-in zoom-in-95 duration-200 bg-[#f3f3f3]/90 dark:bg-[#202020]/90 backdrop-blur-2xl border border-white/50 dark:border-black/50 ring-1 ring-black/5">
+
+                {/* Header - Minimal & Clean */}
+                <div className="flex justify-between items-center px-8 py-5 border-b border-neutral-200/60 dark:border-neutral-700/60 bg-white/50 dark:bg-black/20">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-600 rounded-md text-white shadow-sm">
+                            <Download className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mt-[-2px]">Generar Informe</h2>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Exportar datos a PDF</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors">
-                        <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-md transition-colors text-neutral-500 dark:text-neutral-400"
+                    >
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="p-6 space-y-8">
-                    {/* Date Selection Section */}
-                    <div className="flex flex-col gap-6">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                            <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                                <CalendarIcon className="w-5 h-5 text-blue-500" />
-                                Seleccionar Periodo
-                            </h3>
-                            <div className="text-sm font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                                {format(new Date(startDate), "d MMM yyyy", { locale: es })} - {format(new Date(endDate), "d MMM yyyy", { locale: es })}
+                <div className="p-8 space-y-8">
+
+                    {/* Date Selection Section - FLUENT STYLE */}
+                    <div className="space-y-6">
+
+                        {/* Admin Scope Selector - InfoBar Style */}
+                        {isAdmin && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-3 rounded-md border-l-4 border-blue-600 flex items-center gap-4">
+                                <span className="text-sm font-semibold text-neutral-700 dark:text-neutral-200 uppercase tracking-wide text-[11px]">Alcance</span>
+                                <div className="flex gap-6">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className={`w-4 h-4 rounded-full border border-neutral-400 flex items-center justify-center bg-white ${reportScope === 'me' ? 'border-blue-600' : ''}`}>
+                                            {reportScope === 'me' && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+                                        </div>
+                                        <input type="radio" name="scope" checked={reportScope === 'me'} onChange={() => setReportScope('me')} className="hidden" />
+                                        <span className={`text-sm ${reportScope === 'me' ? 'text-neutral-900 font-medium' : 'text-neutral-600'} transition-colors`}>Solo Mis Partes</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className={`w-4 h-4 rounded-full border border-neutral-400 flex items-center justify-center bg-white ${reportScope === 'all' ? 'border-blue-600' : ''}`}>
+                                            {reportScope === 'all' && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+                                        </div>
+                                        <input type="radio" name="scope" checked={reportScope === 'all'} onChange={() => setReportScope('all')} className="hidden" />
+                                        <span className={`text-sm ${reportScope === 'all' ? 'text-neutral-900 font-medium' : 'text-neutral-600'} transition-colors`}>Global (Todos)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-neutral-200 dark:border-neutral-700 pb-2">
+                            <div>
+                                <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100 flex items-center gap-2">
+                                    Periodo del Informe
+                                </h3>
+                                <p className="text-sm text-neutral-500 mt-1">
+                                    {format(new Date(startDate), "d 'de' MMMM, yyyy", { locale: es })} — {format(new Date(endDate), "d 'de' MMMM, yyyy", { locale: es })}
+                                </p>
+                            </div>
+
+                            {/* Quick Presets - Segmented/Command Bar Style */}
+                            <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
+                                {[
+                                    { label: "Este Mes", action: () => { setStartDate(format(startOfMonth(new Date()), 'yyyy-MM-dd')); setEndDate(format(endOfMonth(new Date()), 'yyyy-MM-dd')); } },
+                                    { label: "Mes Pasado", action: () => { const last = subMonths(new Date(), 1); setStartDate(format(startOfMonth(last), 'yyyy-MM-dd')); setEndDate(format(endOfMonth(last), 'yyyy-MM-dd')); } },
+                                    { label: "Últimos 30", action: () => { setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd')); setEndDate(format(new Date(), 'yyyy-MM-dd')); } },
+                                    { label: "Este Año", action: () => { setStartDate(format(startOfYear(new Date()), 'yyyy-MM-dd')); setEndDate(format(endOfYear(new Date()), 'yyyy-MM-dd')); } }
+                                ].map((btn, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={btn.action}
+                                        className="px-3 py-1.5 rounded-md text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-700 hover:shadow-sm transition-all focus:bg-white focus:text-blue-600"
+                                    >
+                                        {btn.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="flex flex-col md:flex-row gap-8 justify-center items-start w-full">
-                            <div className="flex-1 w-full max-w-sm mx-auto">
-                                <label className="block text-sm font-medium text-slate-500 mb-2 text-center">Fecha Inicio</label>
-                                {/* @ts-ignore */}
-                                <CalendarWithSelectors
-                                    value={startDate}
-                                    onChange={(date) => {
-                                        setStartDate(date);
-                                        if (new Date(date) > new Date(endDate)) {
-                                            setEndDate(date);
-                                        }
-                                    }}
-                                    max={endDate}
-                                    className="w-full"
-                                />
-                            </div>
-
-                            <div className="flex-1 w-full max-w-sm mx-auto">
-                                <label className="block text-sm font-medium text-slate-500 mb-2 text-center">Fecha Fin</label>
-                                {/* @ts-ignore */}
-                                <CalendarWithSelectors
-                                    value={endDate}
-                                    onChange={(date) => {
-                                        if (new Date(date) < new Date(startDate)) {
+                        {/* Calendar Card - High Elevation, White Surface */}
+                        <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
+                            <div className="flex flex-col md:flex-row gap-10 justify-center items-start">
+                                {/* Start Date */}
+                                <div className="flex-1 w-full max-w-sm mx-auto">
+                                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4 border-b border-neutral-100 pb-2">Fecha Inicio</label>
+                                    {/* @ts-ignore */}
+                                    <CalendarWithSelectors
+                                        value={startDate}
+                                        onChange={(date) => {
                                             setStartDate(date);
-                                        }
-                                        setEndDate(date);
-                                    }}
-                                    min={startDate}
-                                    className="w-full"
-                                />
+                                            if (new Date(date) > new Date(endDate)) setEndDate(date);
+                                        }}
+                                        max={endDate}
+                                        className="w-full"
+                                    />
+                                </div>
+
+                                {/* Divider */}
+                                <div className="hidden md:flex h-[300px] w-[1px] bg-neutral-100 dark:bg-neutral-700 my-auto" />
+
+                                {/* End Date */}
+                                <div className="flex-1 w-full max-w-sm mx-auto">
+                                    <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4 border-b border-neutral-100 pb-2">Fecha Fin</label>
+                                    {/* @ts-ignore */}
+                                    <CalendarWithSelectors
+                                        value={endDate}
+                                        onChange={(date) => {
+                                            if (new Date(date) < new Date(startDate)) setStartDate(date);
+                                            setEndDate(date);
+                                        }}
+                                        min={startDate}
+                                        className="w-full"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Preview Section */}
                     <div>
-                        <h3 className="text-lg font-bold mb-4 text-slate-700 dark:text-slate-300">Previsualización de Gráficos</h3>
+                        <h3 className="text-lg font-semibold mb-6 text-neutral-800 dark:text-white border-l-4 border-blue-600 pl-3">
+                            Vista Previa
+                        </h3>
                         <div
                             ref={chartsRef}
                             className="space-y-6"

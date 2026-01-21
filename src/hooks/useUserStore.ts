@@ -1,5 +1,5 @@
 import { useAppStore } from '../store/useAppStore';
-import { useMemo } from 'react';
+
 
 /**
  * Hook tailored to return ONLY the data belonging to the current user.
@@ -7,20 +7,29 @@ import { useMemo } from 'react';
  */
 export function useUserStore() {
     const store = useAppStore();
-    const { currentUser, partes, clients } = store;
+    const { partes, clients } = store;
 
     // Filtered Data
+    // Filtered Data - UPDATED: All users see ALL data
+    const userPartes = partes; // No filtering: return partes;
+    const userClients = clients; // No filtering: return clients;
+
+    // We can still compute ownership if needed for UI (e.g. highlight "My Partes")
+    // but the requirement is "que todos los usuarios pudieran ver la información del resto"
+
+    /* 
     const userPartes = useMemo(() => {
         if (!currentUser) return [];
         // Legacy support: if userId is missing (old data), treat as "global" or handle migration.
-        // For strict isolation: p.userId === currentUser.email
-        return partes.filter(p => p.userId === currentUser.email);
+        // For strict isolation: p.userId === currentUser.id
+        return partes.filter(p => p.userId === currentUser.id || p.userId === currentUser.email);
     }, [partes, currentUser]);
 
     const userClients = useMemo(() => {
         if (!currentUser) return [];
-        return clients.filter(c => c.userId === currentUser.email);
+        return clients.filter(c => c.userId === currentUser.id || c.userId === currentUser.email);
     }, [clients, currentUser]);
+    */
 
     return {
         ...store,

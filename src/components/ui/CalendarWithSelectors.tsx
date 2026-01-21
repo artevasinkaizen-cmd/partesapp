@@ -44,7 +44,7 @@ export const CalendarWithSelectors = ({ value, onChange, min, max, className }: 
     };
 
     return (
-        <div className={`p-4 rounded-xl glass-card border border-white/20 shadow-xl bg-white dark:bg-slate-900 ring-1 ring-black/5 flex flex-col items-center ${className}`}>
+        <div className={`flex flex-col items-center ${className}`}>
 
             {/* Custom Header with Selectors */}
             <div className="w-full flex justify-between items-center mb-4 px-2 gap-2">
